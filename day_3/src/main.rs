@@ -1,3 +1,5 @@
+#![feature(iter_array_chunks)]
+
 use std::fs;
 use std::path::Path;
 
@@ -12,10 +14,8 @@ fn main() {
     let priority_sum: u32 = content
         .split("\n")
         .filter(|line| line.len() > 0)
-        .map(|line| {
-            let middle = line.len() / 2;
-            get_duplicate_item_priority(&line[..middle], &line[middle..])
-        })
+        .array_chunks::<3>()
+        .map(|chunk| get_duplicate_item_priority(&chunk))
         .sum();
     println!("Total: {}", priority_sum);
 }
@@ -23,20 +23,22 @@ fn main() {
 /// Returns the priority of the item found in both compartments.
 ///
 /// Panics if not exactly one duplicate is found.
-fn get_duplicate_item_priority(l: &str, r: &str) -> u32 {
-    let l_items = find_items(l);
-    let r_items = find_items(r);
+fn get_duplicate_item_priority(containers: &[&str]) -> u32 {
+    let mut common_items = !0u64;
+    for each in containers {
+        let items = find_items(each);
+        common_items = common_items & items;
+    }
 
-    let masked = l_items & r_items;
-    if masked != 0 {
+    if common_items != 0 {
         // Just in case, panic if there are multiple duplicates.
-        if (masked ^ (0b1 << masked.trailing_zeros())) != 0 {
-            panic!("multiple duplicate items found: {} {}", l, r);
+        if (common_items ^ (0b1 << common_items.trailing_zeros())) != 0 {
+            panic!("multiple duplicate items found");
         }
         // Since a is priority 1 and represented as 0b10, trailing_zeros() equals the priority.
-        return masked.trailing_zeros();
+        return common_items.trailing_zeros();
     } else {
-        panic!("no duplicate items found: {} {}", l, r);
+        panic!("no duplicate items found");
     }
 }
 
@@ -69,13 +71,13 @@ mod tests {
 
     #[test]
     fn test_get_duplicate_item_priority() {
-        assert_eq!(get_duplicate_item_priority("abc", "ABc"), 3);
-        assert_eq!(get_duplicate_item_priority("abC", "CBA"), 29);
+        assert_eq!(get_duplicate_item_priority(&["abc", "ABc"]), 3);
+        assert_eq!(get_duplicate_item_priority(&["abC", "CBA"]), 29);
     }
 
     #[test]
     #[should_panic]
-    fn test_get_duplicate_item_priority__panics_on_multiple_duplicates() {
-        get_duplicate_item_priority("abc", "dab");
+    fn test_get_duplicate_item_priority_panics_on_multiple_duplicates() {
+        get_duplicate_item_priority(&["abc", "dab"]);
     }
 }
