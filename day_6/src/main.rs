@@ -2,6 +2,8 @@ use anyhow::{anyhow, Error, Result};
 use std::fs;
 use std::path::Path;
 
+const WINDOW_SIZE: usize = 14;
+
 fn main() -> Result<(), Error> {
     let input_path = Path::new("input.txt");
 
@@ -11,9 +13,9 @@ fn main() -> Result<(), Error> {
     };
 
     let mut match_idx = 0;
-    let mut window_end = 4;
+    let mut window_end = WINDOW_SIZE;
     loop {
-        let window = &content[window_end - 4..window_end];
+        let window = &content[window_end - WINDOW_SIZE..window_end];
         let mut found_chars = 0u64;
         let mut dupe = false;
         for b in window.chars() {
