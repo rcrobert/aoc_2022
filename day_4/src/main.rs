@@ -17,11 +17,15 @@ fn main() {
         .map(|line| parse_assignments(line))
         .map(|result: Result<Vec<Assignment>>| {
             result.map(|assignments| {
-                assignments[0].contains(&assignments[1]) || assignments[1].contains(&assignments[0])
+                let overlaps = assignments[0].overlaps(&assignments[1]);
+                if !overlaps {
+                    println!("{:?} {:?}", assignments[0], assignments[1]);
+                }
+                overlaps
             })
         })
         .try_fold(0, |acc, result| {
-            result.map(|contains| if contains { acc + 1 } else { acc })
+            result.map(|overlaps| if overlaps { acc + 1 } else { acc })
         });
 
     match num_overlaps {
@@ -51,6 +55,7 @@ impl Assignment {
     fn overlaps(&self, other: &Self) -> bool {
         self.start <= other.end && self.start >= other.start
             || self.end <= other.end && self.end >= other.start
+            || self.contains(other)
     }
 }
 
@@ -74,6 +79,10 @@ impl FromStr for Assignment {
             bail!("failed to parse assignment '{}'", s);
         }
 
+        if result.start > result.end {
+            bail!("invalid assignment '{}'", s);
+        }
+
         return Ok(result);
     }
 }
@@ -84,24 +93,35 @@ mod tests {
 
     #[test]
     fn test_assignment_fromstr() -> Result<()> {
-        assert_eq!(
-            "1-2".parse::<Assignment>()?,
-            Assignment { start: 1, end: 2 }
-        );
-
-        assert_eq!(
-            "10-2000".parse::<Assignment>()?,
-            Assignment {
-                start: 10,
-                end: 2000
-            }
-        );
-
+        assert_eq!("1-2".parse::<Assignment>()?, assignment(1, 2));
+        assert_eq!("10-2000".parse::<Assignment>()?, assignment(10, 2000));
         Ok(())
     }
 
     #[test]
     fn test_assignment_fromstr_fails() {
         assert!("a-b".parse::<Assignment>().is_err());
+        assert!("2-1".parse::<Assignment>().is_err());
+    }
+
+    #[test]
+    fn test_assignment_overlaps() {
+        assert!(assignment(1, 2).overlaps(&assignment(2, 3)));
+        assert!(assignment(1, 2).overlaps(&assignment(2, 3)));
+        assert!(assignment(1, 3).overlaps(&assignment(2, 3)));
+
+        assert!(assignment(2, 3).overlaps(&assignment(1, 2)));
+        assert!(assignment(2, 3).overlaps(&assignment(1, 2)));
+        assert!(assignment(2, 4).overlaps(&assignment(1, 2)));
+
+        assert!(assignment(1, 10).overlaps(&assignment(2, 2)));
+        assert!(assignment(2, 2).overlaps(&assignment(1, 10)));
+    }
+
+    fn assignment(start: u32, end: u32) -> Assignment {
+        Assignment {
+            start: start,
+            end: end,
+        }
     }
 }
