@@ -16,9 +16,6 @@ fn main() -> Result<(), Error> {
     let fs = construct(&content)?;
 
     let sizes = calculate_sizes(&fs);
-    for (path, _) in &sizes {
-        println!("{}", path.display());
-    }
 
     let total: u64 = sizes
         .iter()
