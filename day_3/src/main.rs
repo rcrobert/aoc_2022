@@ -20,16 +20,14 @@ fn main() {
     println!("Total: {}", priority_sum);
 }
 
-/// Returns the priority of the item found in both compartments.
+/// Returns the priority of the item found in all compartments.
 ///
 /// Panics if not exactly one duplicate is found.
 fn get_duplicate_item_priority(containers: &[&str]) -> u32 {
-    let mut common_items = !0u64;
-    for each in containers {
-        let items = find_items(each);
-        common_items = common_items & items;
-    }
-
+    let common_items = containers
+        .iter()
+        .map(|each| find_items(each))
+        .fold(!0u64, |acc, each| acc & each);
     if common_items != 0 {
         // Just in case, panic if there are multiple duplicates.
         if (common_items ^ (0b1 << common_items.trailing_zeros())) != 0 {
