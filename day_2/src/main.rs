@@ -27,28 +27,60 @@ enum Throw {
     Scissors,
 }
 
+enum Outcome {
+    Win,
+    Lose,
+    Draw,
+}
+
 struct Match {
     mine: Throw,
     theirs: Throw,
 }
 
+fn get_throw(theirs: Throw, outcome: Outcome) -> Throw {
+    match theirs {
+        Throw::Rock => match outcome {
+            Outcome::Win => Throw::Paper,
+            Outcome::Lose => Throw::Scissors,
+            Outcome::Draw => theirs,
+        },
+        Throw::Paper => match outcome {
+            Outcome::Win => Throw::Scissors,
+            Outcome::Lose => Throw::Rock,
+            Outcome::Draw => theirs,
+        },
+        Throw::Scissors => match outcome {
+            Outcome::Win => Throw::Rock,
+            Outcome::Lose => Throw::Paper,
+            Outcome::Draw => theirs,
+        },
+    }
+}
+
 impl Match {
     fn from_str(s: &str) -> Self {
-        let throws: Vec<&str> = s.split(" ").collect();
+        let fields: Vec<&str> = s.split(" ").collect();
+
+        let theirs = match fields[0] {
+            "A" => Throw::Rock,
+            "B" => Throw::Paper,
+            "C" => Throw::Scissors,
+            _ => panic!("unknown opponent throw"),
+        };
+
+        let outcome = match fields[1] {
+            "X" => Outcome::Lose,
+            "Y" => Outcome::Draw,
+            "Z" => Outcome::Win,
+            _ => panic!("unknown outcome"),
+        };
+
+        let mine = get_throw(theirs, outcome);
 
         Match {
-            theirs: match throws[0] {
-                "A" => Throw::Rock,
-                "B" => Throw::Paper,
-                "C" => Throw::Scissors,
-                _ => panic!("unknown opponent throw"),
-            },
-            mine: match throws[1] {
-                "X" => Throw::Rock,
-                "Y" => Throw::Paper,
-                "Z" => Throw::Scissors,
-                _ => panic!("unknown own throw"),
-            },
+            theirs: theirs,
+            mine: mine,
         }
     }
 
