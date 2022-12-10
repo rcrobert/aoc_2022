@@ -3,6 +3,8 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Component, Path, PathBuf};
 
+const MAX_SIZE: u64 = 100000;
+
 fn main() -> Result<(), Error> {
     let input_path = Path::new("input.txt");
 
@@ -12,7 +14,19 @@ fn main() -> Result<(), Error> {
     };
 
     let fs = construct(&content)?;
-    println!("{:?}", fs);
+
+    let sizes = calculate_sizes(&fs);
+    for (path, _) in &sizes {
+        println!("{}", path.display());
+    }
+
+    let total: u64 = sizes
+        .iter()
+        .map(|(path, size)| *size)
+        .filter(|size| size <= &MAX_SIZE)
+        .sum();
+
+    println!("Total: {}", total);
 
     Ok(())
 }
@@ -66,7 +80,9 @@ fn construct(content: &str) -> Result<FileSystem> {
                                 size: components[0].parse()?,
                                 name: String::from(components[1]),
                             };
-                            fs.insert(cwd.clone(), file);
+                            let mut file_path = cwd.clone();
+                            file_path.push(&file.name);
+                            fs.insert(file_path, file);
                         }
                     }
 
@@ -81,7 +97,7 @@ fn construct(content: &str) -> Result<FileSystem> {
     Ok(fs)
 }
 
-fn canonicalize(p: &PathBuf) -> Result<PathBuf> {
+fn canonicalize(p: &Path) -> Result<PathBuf> {
     if !p.is_absolute() {
         return Err(anyhow!("cannot do relative paths"));
     }
@@ -99,4 +115,47 @@ fn canonicalize(p: &PathBuf) -> Result<PathBuf> {
         }
     }
     return Ok(r);
+}
+
+fn calculate_sizes(fs: &FileSystem) -> BTreeMap<PathBuf, u64> {
+    let mut sizes: BTreeMap<PathBuf, u64> = BTreeMap::new();
+    for (path, file) in fs {
+        // Skip 1 in ancestors because that is the file itself, not the directory
+        for ancestor in path.ancestors().skip(1) {
+            match sizes.get_mut(ancestor) {
+                Some(val) => {
+                    *val += file.size;
+                }
+                None => {
+                    sizes.insert(ancestor.to_path_buf(), file.size);
+                }
+            }
+        }
+    }
+    return sizes;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_canonicalize() -> Result<()> {
+        assert_eq!(
+            canonicalize(Path::new("/parent/child/.."))?,
+            Path::new("/parent")
+        );
+        assert_eq!(
+            canonicalize(Path::new("/parent/child/."))?,
+            Path::new("/parent/child")
+        );
+        assert_eq!(
+            canonicalize(Path::new("/parent/../aunt/child/."))?,
+            Path::new("/aunt/child")
+        );
+        assert_eq!(canonicalize(Path::new("/parent/.."))?, Path::new("/"));
+        assert_eq!(canonicalize(Path::new("//.."))?, Path::new("/"));
+
+        Ok(())
+    }
 }
