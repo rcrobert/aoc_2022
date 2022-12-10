@@ -16,9 +16,12 @@ fn main() -> Result<(), Error> {
         yard.crane_lift(parse_action(line)?)?;
     }
 
-    for stack in &yard.stacks {
-        println!("{:?}", stack.last());
-    }
+    let tops: String = yard
+        .stacks
+        .iter()
+        .map(|stack| stack.last().ok_or(anyhow!("empty stack")))
+        .collect::<Result<_>>()?;
+    println!("{}", tops);
 
     Ok(())
 }
@@ -36,14 +39,25 @@ impl Yard {
     }
 
     fn crane_lift(&mut self, action: Action) -> Result<()> {
-        for _ in 0..action.count {
-            // Our internal stacks are zero indexed, adjust the index
-            let c = self.stacks[(action.from - 1) as usize]
-                .pop()
-                .ok_or(anyhow!("no crate in stack {}", action.from))?;
+        // Our internal stacks are zero indexed, adjust the index
+        let from_stack = self
+            .stacks
+            .get_mut((action.from - 1) as usize)
+            .ok_or(anyhow!("no such stack"))?;
 
-            self.stacks[(action.to - 1) as usize].push(c);
+        if action.count as usize > from_stack.len() {
+            return Err(anyhow!("not enough crates remaining"));
         }
+
+        let at = from_stack.len() - action.count as usize;
+        let mut crates = from_stack.split_off(at);
+
+        // Our internal stacks are zero indexed, adjust the index
+        let to_stack = self
+            .stacks
+            .get_mut((action.to - 1) as usize)
+            .ok_or(anyhow!("no such stack"))?;
+        to_stack.append(&mut crates);
 
         Ok(())
     }
@@ -172,8 +186,8 @@ mod tests {
 
     #[test]
     fn test_crane_lift() -> Result<()> {
-        let assert_tops = |yard: &Yard, tops: Vec<char>| {
-            let actual_tops: Vec<_> = yard
+        let get_tops = |yard: &Yard| -> Vec<char> {
+            return yard
                 .stacks
                 .iter()
                 .map(|stack| stack.last())
@@ -182,33 +196,36 @@ mod tests {
                     None => ' ',
                 })
                 .collect();
-            assert_eq!(actual_tops, tops);
         };
 
+        // It can move crates
         {
             let mut yard = Yard {
                 stacks: vec![vec!['A'], vec!['B']],
             };
             yard.crane_lift(parse_action("move 1 from 1 to 2")?)?;
-            assert_tops(&yard, vec![' ', 'A']);
+            assert_eq!(get_tops(&yard), vec![' ', 'A']);
         }
 
+        // It can move multiple crates
         {
             let mut yard = Yard {
-                stacks: vec![vec!['A'], vec!['B', 'C']],
+                stacks: vec![vec!['A'], vec!['B', 'C', 'D']],
             };
             yard.crane_lift(parse_action("move 2 from 2 to 1")?)?;
-            assert_tops(&yard, vec!['B', ' ']);
+            assert_eq!(get_tops(&yard), vec!['D', 'B']);
         }
 
+        // It can move crates to empty stacks
         {
             let mut yard = Yard {
                 stacks: vec![vec!['A'], vec![]],
             };
             yard.crane_lift(parse_action("move 1 from 1 to 2")?)?;
-            assert_tops(&yard, vec![' ', 'A']);
+            assert_eq!(get_tops(&yard), vec![' ', 'A']);
         }
 
+        // It fails to move a crate from an empty stack
         {
             let mut yard = Yard {
                 stacks: vec![vec![], vec!['B']],
