@@ -4,6 +4,8 @@ use std::fs;
 use std::path::{Component, Path, PathBuf};
 
 const MAX_SIZE: u64 = 100000;
+const TOTAL_SPACE: u64 = 70000000;
+const MINIMUM_SPACE: u64 = 30000000;
 
 fn main() -> Result<(), Error> {
     let input_path = Path::new("input.txt");
@@ -17,13 +19,34 @@ fn main() -> Result<(), Error> {
 
     let sizes = calculate_sizes(&fs);
 
-    let total: u64 = sizes
-        .iter()
-        .map(|(path, size)| *size)
-        .filter(|size| size <= &MAX_SIZE)
-        .sum();
+    let used_space = sizes[Path::new("/")];
+    let free_space = TOTAL_SPACE - used_space;
+    let space_to_free = MINIMUM_SPACE - free_space;
 
-    println!("Total: {}", total);
+    let (optimal_delete, _) = sizes
+        .iter()
+        // Don't consider directories that are too small
+        .filter(|(_, size)| **size >= space_to_free)
+        // Consider error from space_to_free
+        .map(|(path, size)| (path, *size - space_to_free))
+        // Fold by keeping the lesser error path
+        .fold(
+            (Path::new(""), TOTAL_SPACE),
+            |(best_path, best_error), (path, error)| {
+                if error < best_error {
+                    return (path.as_path(), error);
+                } else {
+                    return (best_path, best_error);
+                }
+            },
+        );
+
+    println!(
+        "Delete {} (size {}), to free at least {}",
+        optimal_delete.display(),
+        sizes[optimal_delete],
+        space_to_free,
+    );
 
     Ok(())
 }
