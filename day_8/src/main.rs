@@ -14,9 +14,9 @@ fn main() -> Result<()> {
     };
 
     let forest = parse_forest(&content)?;
-    let visible_trees = find_visible_trees(&forest);
+    let best_view = find_best_view(&forest);
 
-    println!("{}", visible_trees.len());
+    println!("{}", best_view);
     Ok(())
 }
 
@@ -26,6 +26,7 @@ struct Forest {
 
 type TreeHeight = i32;
 
+#[derive(Copy, Clone)]
 enum Direction {
     North,
     East,
@@ -52,6 +53,50 @@ impl Forest {
             index: 0,
         }
     }
+
+    fn iter_direction(&self, location: Coordinate, direction: Direction) -> DirectionIterator {
+        DirectionIterator {
+            forest: self,
+            direction: direction,
+            loc: location,
+        }
+    }
+}
+
+struct DirectionIterator<'a> {
+    forest: &'a Forest,
+    direction: Direction,
+    loc: Coordinate,
+}
+
+impl<'a> Iterator for DirectionIterator<'a> {
+    type Item = TreeHeight;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.direction {
+            Direction::North => {
+                if self.loc.y == 0 {
+                    return None;
+                }
+                self.loc = Coordinate::new(self.loc.x, self.loc.y - 1);
+                return self.forest.get_tree(self.loc);
+            }
+            Direction::South => {
+                self.loc = Coordinate::new(self.loc.x, self.loc.y + 1);
+                return self.forest.get_tree(self.loc);
+            }
+            Direction::East => {
+                self.loc = Coordinate::new(self.loc.x + 1, self.loc.y);
+                return self.forest.get_tree(self.loc);
+            }
+            Direction::West => {
+                if self.loc.x == 0 {
+                    return None;
+                }
+                self.loc = Coordinate::new(self.loc.x - 1, self.loc.y);
+                return self.forest.get_tree(self.loc);
+            }
+        }
+    }
 }
 
 struct Columns<'a> {
@@ -71,6 +116,57 @@ impl<'a> Iterator for Columns<'a> {
         self.index += 1;
         return next_item;
     }
+}
+
+fn find_best_view(forest: &Forest) -> i32 {
+    let directions = vec![
+        Direction::North,
+        Direction::East,
+        Direction::South,
+        Direction::West,
+    ];
+
+    let mut max_beautiful_tree = Coordinate::new(0, 0);
+    let mut max_beauty = 0;
+    let mut max_counts = vec![];
+    for (y, row) in forest.rows().enumerate() {
+        for (x, _) in row.iter().enumerate() {
+            let counts: Vec<_> = directions
+                .iter()
+                .map(|direction| count_visible_trees(forest, Coordinate::new(x, y), *direction))
+                .collect();
+            let beauty = directions
+                .iter()
+                .map(|direction| count_visible_trees(forest, Coordinate::new(x, y), *direction))
+                .fold(1, |acc, count| acc * count);
+            if beauty > max_beauty {
+                max_beauty = beauty;
+                max_beautiful_tree = Coordinate::new(x, y);
+                max_counts = counts;
+            }
+        }
+    }
+    println!(
+        "{:?} at {:?} {:?}",
+        forest.get_tree(max_beautiful_tree),
+        max_beautiful_tree,
+        max_counts,
+    );
+    return max_beauty;
+}
+
+fn count_visible_trees(forest: &Forest, location: Coordinate, direction: Direction) -> i32 {
+    let my_height = forest.get_tree(location).unwrap();
+
+    let mut count = 0;
+    for height in forest.iter_direction(location, direction) {
+        count += 1;
+        if height >= my_height {
+            break;
+        }
+    }
+
+    count
 }
 
 fn find_visible_trees(forest: &Forest) -> HashSet<Coordinate> {
@@ -189,15 +285,79 @@ mod tests {
     }
 
     #[test]
-    fn test_forest_columns() -> Result<()> {
-        let f = parse_forest("123\n456\n789")?;
-        let mut it = f.columns();
-        assert_eq!(it.next().unwrap(), vec![1, 4, 7]);
-        assert_eq!(it.next().unwrap(), vec![2, 5, 8]);
-        assert_eq!(it.next().unwrap(), vec![3, 6, 9]);
-        assert!(it.next().is_none());
+    fn test_count_visible_trees() -> Result<()> {
+        let f = parse_forest("111\n111\n111")?;
+        assert_eq!(
+            count_visible_trees(&f, Coordinate::new(0, 0), Direction::North),
+            0
+        );
+
+        let f = parse_forest("111\n213\n111")?;
+        assert_eq!(
+            count_visible_trees(&f, Coordinate::new(0, 1), Direction::East),
+            2
+        );
+
+        let f = parse_forest("111\n223\n111")?;
+        assert_eq!(
+            count_visible_trees(&f, Coordinate::new(0, 1), Direction::East),
+            1
+        );
+
+        let f = parse_forest("111\n211\n111")?;
+        assert_eq!(
+            count_visible_trees(&f, Coordinate::new(0, 1), Direction::East),
+            2
+        );
 
         Ok(())
+    }
+
+    mod forest {
+        use super::*;
+
+        #[test]
+        fn test_columns() -> Result<()> {
+            let f = parse_forest("123\n456\n789")?;
+            let mut it = f.columns();
+            assert_eq!(it.next().unwrap(), vec![1, 4, 7]);
+            assert_eq!(it.next().unwrap(), vec![2, 5, 8]);
+            assert_eq!(it.next().unwrap(), vec![3, 6, 9]);
+            assert!(it.next().is_none());
+
+            Ok(())
+        }
+
+        #[test]
+        fn test_iter_direction() -> Result<()> {
+            let f = parse_forest("123\n456\n789")?;
+
+            let mut it = f.iter_direction(Coordinate::new(1, 1), Direction::North);
+            assert_eq!(it.next().unwrap(), 2);
+            assert!(it.next().is_none());
+
+            let mut it = f.iter_direction(Coordinate::new(1, 1), Direction::South);
+            assert_eq!(it.next().unwrap(), 8);
+            assert!(it.next().is_none());
+
+            let mut it = f.iter_direction(Coordinate::new(1, 1), Direction::East);
+            assert_eq!(it.next().unwrap(), 6);
+            assert!(it.next().is_none());
+
+            let mut it = f.iter_direction(Coordinate::new(1, 1), Direction::West);
+            assert_eq!(it.next().unwrap(), 4);
+            assert!(it.next().is_none());
+
+            let mut it = f.iter_direction(Coordinate::new(0, 0), Direction::West);
+            assert!(it.next().is_none());
+
+            let mut it = f.iter_direction(Coordinate::new(0, 0), Direction::South);
+            assert_eq!(it.next().unwrap(), 4);
+            assert_eq!(it.next().unwrap(), 7);
+            assert!(it.next().is_none());
+
+            Ok(())
+        }
     }
 
     #[test]
