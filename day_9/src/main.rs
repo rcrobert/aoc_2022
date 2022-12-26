@@ -40,17 +40,14 @@ fn calculate_tail_positions<T>(steps: T) -> Result<HashSet<Coordinate>>
 where
     T: Iterator<Item = (Direction, usize)>,
 {
-    let mut head = Coordinate::new(0, 0);
-    let mut tail = Coordinate::new(0, 0);
-    let mut tail_positions = HashSet::new();
+    let mut rope = Rope::new(10);
 
-    tail_positions.insert(Coordinate::new(0, 0));
+    let mut tail_positions = HashSet::new();
 
     for (direction, distance) in steps {
         for _ in 0..distance {
-            head = move_knot(head, direction);
-            tail = update_tail(tail, head);
-            tail_positions.insert(tail);
+            rope.move_head(direction);
+            tail_positions.insert(*rope.segments.last().unwrap());
         }
     }
 
@@ -107,6 +104,33 @@ fn update_tail(mut tail: Coordinate, head: Coordinate) -> Coordinate {
     tail
 }
 
+#[derive(Clone, Debug)]
+struct Rope {
+    segments: Vec<Coordinate>,
+}
+
+impl Rope {
+    fn new(length: usize) -> Self {
+        Self {
+            segments: (0..length).map(|_| Coordinate::new(0, 0)).collect(),
+        }
+    }
+
+    fn move_head(&mut self, direction: Direction) {
+        let head = move_knot(self.segments[0], direction);
+
+        let mut new_segments = vec![head];
+        let mut last_segment = head;
+        for segment in self.segments.iter().skip(1) {
+            let new_segment = update_tail(*segment, last_segment);
+            last_segment = new_segment;
+            new_segments.push(new_segment);
+        }
+
+        self.segments.swap_with_slice(&mut new_segments);
+    }
+}
+
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 struct Coordinate {
     x: i32,
@@ -114,7 +138,7 @@ struct Coordinate {
 }
 
 impl Coordinate {
-    fn new(x: i32, y: i32) -> Coordinate {
+    fn new(x: i32, y: i32) -> Self {
         Coordinate { x: x, y: y }
     }
 
@@ -126,41 +150,6 @@ impl Coordinate {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_example() -> Result<()> {
-        let steps = vec![
-            (Direction::Right, 4),
-            (Direction::Up, 4),
-            (Direction::Left, 3),
-            (Direction::Down, 1),
-            (Direction::Right, 4),
-            (Direction::Down, 1),
-            (Direction::Left, 5),
-            (Direction::Right, 2),
-        ];
-        let expected = HashSet::from_iter(
-            vec![
-                Coordinate::new(0, 0),
-                Coordinate::new(1, 0),
-                Coordinate::new(2, 0),
-                Coordinate::new(3, 0),
-                Coordinate::new(4, 1),
-                Coordinate::new(1, 2),
-                Coordinate::new(2, 2),
-                Coordinate::new(3, 2),
-                Coordinate::new(4, 2),
-                Coordinate::new(3, 3),
-                Coordinate::new(4, 3),
-                Coordinate::new(2, 4),
-                Coordinate::new(3, 4),
-            ]
-            .into_iter(),
-        );
-        assert_eq!(calculate_tail_positions(steps.into_iter())?, expected);
-
-        Ok(())
-    }
 
     #[test]
     fn test_move_knot() {
