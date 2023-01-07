@@ -3,7 +3,9 @@ use std::fs;
 use std::path::Path;
 
 mod cpu;
+mod screen;
 use cpu::{parse_instruction, Cpu};
+use screen::Screen;
 
 fn main() -> Result<()> {
     let input_path = Path::new("input.txt");
@@ -18,22 +20,18 @@ fn main() -> Result<()> {
         .map(parse_instruction)
         .collect::<Result<_>>()?;
 
-    let interesting_cycles = vec![20, 60, 100, 140, 180, 220];
-    let mut signal_strength = 0;
-
     let mut cpu = Cpu::new(program);
+    let mut screen = Screen::new(40, 6);
     loop {
+        screen.draw(&cpu);
+
         let done = cpu.step().is_none();
         if done {
             break;
         }
-        // Cpu cycles are 0 indexed, the prompt is not
-        let cycle_number = cpu.current_cycle + 1;
-        if interesting_cycles.contains(&cycle_number) {
-            signal_strength += cycle_number as i32 * cpu.register;
-        }
     }
 
-    println!("Signal strength: {}", signal_strength);
+    println!("{}", screen);
+
     Ok(())
 }
