@@ -27,8 +27,10 @@ fn main() -> Result<()> {
         if done {
             break;
         }
-        if interesting_cycles.contains(&cpu.current_cycle) {
-            signal_strength += cpu.current_cycle as i32 * cpu.register;
+        // Cpu cycles are 0 indexed, the prompt is not
+        let cycle_number = cpu.current_cycle + 1;
+        if interesting_cycles.contains(&cycle_number) {
+            signal_strength += cycle_number as i32 * cpu.register;
         }
     }
 

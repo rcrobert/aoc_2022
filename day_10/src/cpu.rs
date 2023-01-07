@@ -30,8 +30,8 @@ impl Cpu {
     pub fn new(program: Vec<Instruction>) -> Self {
         Self {
             register: 1,
-            current_cycle: 1,
-            cycle_instruction_started: 1,
+            current_cycle: 0,
+            cycle_instruction_started: 0,
             program_idx: 0,
             program: program,
         }
